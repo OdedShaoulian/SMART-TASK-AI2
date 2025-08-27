@@ -220,7 +220,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 1. **Fork the repository**
 2. **Clone your fork**:
    ```bash
-   git clone https://github.com/your-username/SMART-TASK-AI2.git
+   git clone https://github.com/OdedShaoulian/SMART-TASK-AI2.git
    cd SMART-TASK-AI2
    ```
 3. **Install dependencies**:
@@ -253,11 +253,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - 📖 **Documentation**: Check the [README](README.md) and inline code comments
 - 🐛 **Bug Reports**: Use our [Bug Report Template](.github/ISSUE_TEMPLATE/bug_report.md)
 - 💡 **Feature Requests**: Use our [Feature Request Template](.github/ISSUE_TEMPLATE/feature_request.md)
-- 💬 **Discussions**: Start a [GitHub Discussion](https://github.com/your-username/SMART-TASK-AI2/discussions)
+- 💬 **Discussions**: Start a [GitHub Discussion](https://github.com/OdedShaoulian/SMART-TASK-AI2/discussions)
 
 ### Security
 
-If you discover a security vulnerability, please report it via email to [your-email@example.com](mailto:your-email@example.com) instead of using the issue tracker. See our [Security Policy](SECURITY.md) for details.
+If you discover a security vulnerability, please report it via email to [odedshaoulian@example.com](mailto:odedshaoulian@example.com) instead of using the issue tracker. See our [Security Policy](SECURITY.md) for details.
 
 ## 🚀 Deployment
 
@@ -289,7 +289,7 @@ If you discover a security vulnerability, please report it via email to [your-em
 
 ## 📊 Project Status
 
-![CI/CD](https://github.com/your-username/SMART-TASK-AI2/workflows/CI%2FCD%20Pipeline/badge.svg)
+![CI/CD](https://github.com/OdedShaoulian/SMART-TASK-AI2/workflows/CI%2FCD%20Pipeline/badge.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)

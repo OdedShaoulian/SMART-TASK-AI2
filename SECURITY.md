@@ -15,7 +15,7 @@ We take the security of SmartTask AI seriously. If you believe you have found a 
 
 **Please do not report security vulnerabilities through public GitHub issues.**
 
-Instead, please report them via email to [your-email@example.com](mailto:your-email@example.com).
+Instead, please report them via email to [odedshaoulian@example.com](mailto:odedshaoulian@example.com).
 
 You should receive a response within 48 hours. If for some reason you do not, please follow up via email to ensure we received your original message.
 

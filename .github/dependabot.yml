@@ -7,9 +7,9 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 10
     reviewers:
-      - "your-username"
+      - "OdedShaoulian"
     assignees:
-      - "your-username"
+      - "OdedShaoulian"
 
   # Enable version updates for npm in server directory
   - package-ecosystem: "npm"
@@ -18,9 +18,9 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 10
     reviewers:
-      - "your-username"
+      - "OdedShaoulian"
     assignees:
-      - "your-username"
+      - "OdedShaoulian"
 
   # Enable version updates for npm in client directory
   - package-ecosystem: "npm"
@@ -29,9 +29,9 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 10
     reviewers:
-      - "your-username"
+      - "OdedShaoulian"
     assignees:
-      - "your-username"
+      - "OdedShaoulian"
 
   # Enable version updates for GitHub Actions
   - package-ecosystem: "github-actions"
@@ -40,6 +40,6 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 10
     reviewers:
-      - "your-username"
+      - "OdedShaoulian"
     assignees:
-      - "your-username"
+      - "OdedShaoulian"
