@@ -1,0 +1,39 @@
+{
+  "name": "smart-task-ai2",
+  "version": "1.0.0",
+  "description": "SmartTask AI - Full-stack authentication system with Express + Prisma backend and React frontend",
+  "private": true,
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client && npm run dev",
+    "build": "npm run build:server && npm run build:client",
+    "build:server": "cd server && npm run build",
+    "build:client": "cd client && npm run build",
+    "test": "npm run test:server && npm run test:client",
+    "test:server": "cd server && npm test",
+    "test:client": "cd client && npm test",
+    "test:e2e": "cd client && npm run test:e2e",
+    "install:all": "npm install && cd server && npm install && cd ../client && npm install",
+    "clean": "rm -rf node_modules server/node_modules client/node_modules server/dist client/dist"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.9.2"
+  },
+  "keywords": [
+    "authentication",
+    "express",
+    "prisma",
+    "react",
+    "typescript",
+    "jwt",
+    "security"
+  ],
+  "author": "SmartTask AI Team",
+  "license": "MIT"
+}
