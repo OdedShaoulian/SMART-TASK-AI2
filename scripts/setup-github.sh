@@ -26,18 +26,27 @@ REPO_NAME=${REPO_NAME:-SMART-TASK-AI2}
 # Update files with GitHub username
 echo "🔧 Updating configuration files..."
 
+# Detect OS for sed compatibility
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS
+    SED_CMD="sed -i ''"
+else
+    # Linux
+    SED_CMD="sed -i"
+fi
+
 # Update dependabot.yml
-sed -i "s/your-username/$GITHUB_USERNAME/g" .github/dependabot.yml
+$SED_CMD "s/your-username/$GITHUB_USERNAME/g" .github/dependabot.yml
 
 # Update SECURITY.md
-sed -i "s/your-email@example.com/$GITHUB_USERNAME@example.com/g" SECURITY.md
+$SED_CMD "s/your-email@example.com/$GITHUB_USERNAME@example.com/g" SECURITY.md
 
 # Update CONTRIBUTING.md
-sed -i "s/your-username/$GITHUB_USERNAME/g" CONTRIBUTING.md
+$SED_CMD "s/your-username/$GITHUB_USERNAME/g" CONTRIBUTING.md
 
 # Update README.md
-sed -i "s/your-username/$GITHUB_USERNAME/g" README.md
-sed -i "s/your-email@example.com/$GITHUB_USERNAME@example.com/g" README.md
+$SED_CMD "s/your-username/$GITHUB_USERNAME/g" README.md
+$SED_CMD "s/your-email@example.com/$GITHUB_USERNAME@example.com/g" README.md
 
 echo "✅ Configuration files updated!"
 

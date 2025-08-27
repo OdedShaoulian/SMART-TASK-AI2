@@ -1,0 +1,113 @@
+name: Deploy Backend to Azure
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+# Prevent overlapping deployments
+concurrency:
+  group: backend-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Azure App Service
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+
+    - name: Install server dependencies
+      working-directory: ./server
+      run: npm ci
+
+    - name: Generate Prisma client
+      working-directory: ./server
+      run: npx prisma generate
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+    - name: Build server
+      working-directory: ./server
+      run: npm run build
+      env:
+        JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        COOKIE_SECRET: ${{ secrets.COOKIE_SECRET }}
+        CSRF_SECRET: ${{ secrets.CSRF_SECRET }}
+        CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        JWT_ALGORITHM: HS512
+        JWT_ACCESS_TOKEN_EXPIRY: 10m
+        JWT_REFRESH_TOKEN_EXPIRY: 7d
+
+    - name: Deploy to Azure App Service (Staging)
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+        slot-name: staging
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        package: ./server/dist
+
+    - name: Wait for deployment
+      run: sleep 30
+
+    - name: Run smoke tests
+      run: |
+        # Test health endpoint
+        curl -fSL https://${{ secrets.AZURE_WEBAPP_NAME }}-staging.azurewebsites.net/healthz || exit 1
+        
+        # Test API endpoint (if available)
+        curl -fSL https://${{ secrets.AZURE_WEBAPP_NAME }}-staging.azurewebsites.net/api/health || exit 1
+        
+        echo "✅ Smoke tests passed"
+
+    - name: Login to Azure
+      uses: azure/login@v2
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Run database migrations
+      working-directory: ./server
+      run: |
+        npx prisma migrate deploy
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+    - name: Swap staging to production
+      run: |
+        az webapp deployment slot swap \
+          --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+          --name ${{ secrets.AZURE_WEBAPP_NAME }} \
+          --slot staging \
+          --target-slot production
+
+    - name: Verify production deployment
+      run: |
+        # Wait for swap to complete
+        sleep 60
+        
+        # Test production health endpoint
+        curl -fSL https://${{ secrets.AZURE_WEBAPP_NAME }}.azurewebsites.net/healthz || exit 1
+        
+        echo "✅ Production deployment verified"
+
+    - name: Notify deployment success
+      if: success()
+      run: |
+        echo "🎉 Backend successfully deployed to production!"
+        echo "Production URL: https://${{ secrets.AZURE_WEBAPP_NAME }}.azurewebsites.net"
+
+    - name: Notify deployment failure
+      if: failure()
+      run: |
+        echo "❌ Backend deployment failed!"
+        echo "Check the logs above for details."
+        echo "Staging URL: https://${{ secrets.AZURE_WEBAPP_NAME }}-staging.azurewebsites.net"

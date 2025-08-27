@@ -29,17 +29,17 @@ if "%REPO_NAME%"=="" set REPO_NAME=SMART-TASK-AI2
 echo 🔧 Updating configuration files...
 
 REM Update dependabot.yml
-powershell -Command "(Get-Content .github/dependabot.yml) -replace 'your-username', '%GITHUB_USERNAME%' | Set-Content .github/dependabot.yml"
+powershell -Command "[System.Text.RegularExpressions.Regex]::Escape('your-username') | ForEach-Object { (Get-Content .github/dependabot.yml) -replace $_, '%GITHUB_USERNAME%' | Set-Content .github/dependabot.yml -Encoding UTF8 }"
 
 REM Update SECURITY.md
-powershell -Command "(Get-Content SECURITY.md) -replace 'your-email@example.com', '%GITHUB_USERNAME%@example.com' | Set-Content SECURITY.md"
+powershell -Command "[System.Text.RegularExpressions.Regex]::Escape('your-email@example.com') | ForEach-Object { (Get-Content SECURITY.md) -replace $_, '%GITHUB_USERNAME%@example.com' | Set-Content SECURITY.md -Encoding UTF8 }"
 
 REM Update CONTRIBUTING.md
-powershell -Command "(Get-Content CONTRIBUTING.md) -replace 'your-username', '%GITHUB_USERNAME%' | Set-Content CONTRIBUTING.md"
+powershell -Command "[System.Text.RegularExpressions.Regex]::Escape('your-username') | ForEach-Object { (Get-Content CONTRIBUTING.md) -replace $_, '%GITHUB_USERNAME%' | Set-Content CONTRIBUTING.md -Encoding UTF8 }"
 
 REM Update README.md
-powershell -Command "(Get-Content README.md) -replace 'your-username', '%GITHUB_USERNAME%' | Set-Content README.md"
-powershell -Command "(Get-Content README.md) -replace 'your-email@example.com', '%GITHUB_USERNAME%@example.com' | Set-Content README.md"
+powershell -Command "[System.Text.RegularExpressions.Regex]::Escape('your-username') | ForEach-Object { (Get-Content README.md) -replace $_, '%GITHUB_USERNAME%' | Set-Content README.md -Encoding UTF8 }"
+powershell -Command "[System.Text.RegularExpressions.Regex]::Escape('your-email@example.com') | ForEach-Object { (Get-Content README.md) -replace $_, '%GITHUB_USERNAME%@example.com' | Set-Content README.md -Encoding UTF8 }"
 
 echo ✅ Configuration files updated!
 
