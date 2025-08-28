@@ -92,24 +92,29 @@ az staticwebapp create \
   --output-location "dist"
 ```
 
-### 3. Create Azure Database (Optional)
+### 3. Azure SQL Database (Already Created)
 
 ```bash
-# Create PostgreSQL Flexible Server
-az postgres flexible-server create \
-  --name smarttask-db \
-  --resource-group smarttask-rg \
-  --location eastus \
-  --admin-user dbadmin \
-  --admin-password <secure-password> \
-  --sku-name Standard_B1ms \
-  --version 15
+# Your Azure SQL Database is already created:
+# Server: odeds.database.windows.net
+# Database: smart_task_ai2_db
+# Admin: odeds@mountapps.io
 
-# Create database
-az postgres flexible-server db create \
-  --name smarttask \
-  --server-name smarttask-db \
-  --resource-group smarttask-rg
+# Configure firewall rules (if needed)
+az sql server firewall-rule create \
+  --resource-group smarttask-rg \
+  --server odeds \
+  --name AllowAzureServices \
+  --start-ip-address 0.0.0.0 \
+  --end-ip-address 0.0.0.0
+
+# Allow your IP address
+az sql server firewall-rule create \
+  --resource-group smarttask-rg \
+  --server odeds \
+  --name AllowMyIP \
+  --start-ip-address YOUR_IP_ADDRESS \
+  --end-ip-address YOUR_IP_ADDRESS
 ```
 
 ## Getting Azure Credentials
@@ -156,8 +161,8 @@ az staticwebapp secrets set \
 Set these in Azure Portal → App Service → Configuration → Application settings:
 
 ```bash
-# Database
-DATABASE_URL=postgresql://user:password@host:port/database
+# Database - Azure SQL Database
+DATABASE_URL=sqlserver://odeds.database.windows.net:1433;database=smart_task_ai2_db;user=odeds@mountapps.io;password=YOUR_PASSWORD_HERE;encrypt=true;trustServerCertificate=false;connectionTimeout=30;
 
 # Security
 JWT_SECRET=your-super-secret-jwt-key-here
