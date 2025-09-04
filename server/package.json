@@ -29,7 +29,6 @@
     "express-request-id": "^1.4.1",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
-    "mssql": "^11.0.1",
     "uuid": "^9.0.1",
     "winston": "^3.11.0",
     "zod": "^3.22.4"

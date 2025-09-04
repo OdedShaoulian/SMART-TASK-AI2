@@ -159,3 +159,14 @@ client/.vite/
 
 # Environment files (keep examples)
 !.env.example
+!.env.production.example
+!.env.staging.example
+
+# Block all real environment files
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env.staging
+.env.*.local

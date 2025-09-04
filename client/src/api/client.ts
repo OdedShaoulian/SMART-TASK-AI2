@@ -13,8 +13,8 @@ const apiClient = axios.create({
 // Request interceptor to attach access token
 apiClient.interceptors.request.use(
   (config) => {
-    // Get access token from memory (Zustand store)
-    const accessToken = localStorage.getItem('accessToken');
+    // Get access token from memory (Zustand store) - not localStorage for security
+    const accessToken = (window as any).__authToken || null;
     if (accessToken) {
       config.headers.Authorization = `Bearer ${accessToken}`;
     }
@@ -46,8 +46,8 @@ apiClient.interceptors.response.use(
         );
         
         if (refreshResponse.data.success && refreshResponse.data.data) {
-          // Store new access token in memory
-          localStorage.setItem('accessToken', refreshResponse.data.data.accessToken);
+          // Store new access token in memory (not localStorage for security)
+          (window as any).__authToken = refreshResponse.data.data.accessToken;
           
           // Retry the original request with new token
           originalRequest.headers.Authorization = `Bearer ${refreshResponse.data.data.accessToken}`;
@@ -59,13 +59,13 @@ apiClient.interceptors.response.use(
         
         if (refreshErrorResponse.response?.data?.error?.code === 'TOKEN_REUSE_DETECTED') {
           // Security violation - force logout
-          localStorage.removeItem('accessToken');
+          (window as any).__authToken = null;
           window.location.href = '/login?error=security_violation';
           return Promise.reject(refreshError);
         }
         
         // Other refresh errors - redirect to login
-        localStorage.removeItem('accessToken');
+        (window as any).__authToken = null;
         window.location.href = '/login?error=session_expired';
         return Promise.reject(refreshError);
       }

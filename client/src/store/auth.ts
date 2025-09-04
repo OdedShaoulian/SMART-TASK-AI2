@@ -23,8 +23,8 @@ export const useAuthStore = create<AuthState>()(
           const response = await authApi.login({ email, password });
           
           if (response.success && response.data) {
-            // Store access token in memory (not persisted)
-            localStorage.setItem('accessToken', response.data.accessToken);
+            // Store access token in memory only (not localStorage for security)
+            (window as any).__authToken = response.data.accessToken;
             
             set({
               user: response.data.user,
@@ -55,8 +55,8 @@ export const useAuthStore = create<AuthState>()(
           const response = await authApi.signup({ email, password, name });
           
           if (response.success && response.data) {
-            // Store access token in memory (not persisted)
-            localStorage.setItem('accessToken', response.data.accessToken);
+            // Store access token in memory only (not localStorage for security)
+            (window as any).__authToken = response.data.accessToken;
             
             set({
               user: response.data.user,
@@ -90,7 +90,7 @@ export const useAuthStore = create<AuthState>()(
           console.warn('Logout API call failed:', error);
         } finally {
           // Clear access token from memory
-          localStorage.removeItem('accessToken');
+          (window as any).__authToken = null;
           
           set({
             user: null,
@@ -134,7 +134,7 @@ export const useAuthStore = create<AuthState>()(
           }
         } catch (error: any) {
           // If refresh fails, clear auth state
-          localStorage.removeItem('accessToken');
+          (window as any).__authToken = null;
           
           set({
             user: null,

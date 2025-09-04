@@ -10,6 +10,22 @@ concurrency:
   group: backend-deploy-${{ github.ref }}
   cancel-in-progress: false
 
+# === STAGING (disabled) ===
+# Uncomment the following section to enable staging deployments
+# on:
+#   push:
+#     branches: [ main, develop ]
+#   workflow_dispatch:
+#     inputs:
+#       environment:
+#         description: 'Environment to deploy to'
+#         required: true
+#         default: 'production'
+#         type: choice
+#         options:
+#         - production
+#         - staging
+
 jobs:
   deploy:
     name: Deploy to Azure App Service
@@ -25,6 +41,64 @@ jobs:
         node-version: '20.x'
         cache: 'npm'
 
+    - name: Environment Variable Validation
+      run: |
+        echo "🔍 Validating required environment variables..."
+        
+        # Check Azure deployment secrets
+        if [ -z "${{ secrets.AZURE_WEBAPP_NAME }}" ]; then
+          echo "❌ AZURE_WEBAPP_NAME is required"
+          exit 1
+        else
+          echo "✅ AZURE_WEBAPP_NAME: ${{ secrets.AZURE_WEBAPP_NAME }}"
+        fi
+        
+        if [ -z "${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}" ]; then
+          echo "❌ AZURE_WEBAPP_PUBLISH_PROFILE is required"
+          echo "   Get this from: Azure Portal → App Service → Get publish profile"
+          exit 1
+        else
+          echo "✅ AZURE_WEBAPP_PUBLISH_PROFILE: ${AZURE_WEBAPP_PUBLISH_PROFILE:0:20}***"
+        fi
+        
+        # Check application secrets
+        if [ -z "${{ secrets.DATABASE_URL }}" ]; then
+          echo "❌ DATABASE_URL is required"
+          exit 1
+        else
+          echo "✅ DATABASE_URL: ${DATABASE_URL:0:20}***"
+        fi
+        
+        if [ -z "${{ secrets.JWT_SECRET }}" ]; then
+          echo "❌ JWT_SECRET is required"
+          exit 1
+        else
+          echo "✅ JWT_SECRET: ${JWT_SECRET:0:4}***"
+        fi
+        
+        if [ -z "${{ secrets.COOKIE_SECRET }}" ]; then
+          echo "❌ COOKIE_SECRET is required"
+          exit 1
+        else
+          echo "✅ COOKIE_SECRET: ${COOKIE_SECRET:0:4}***"
+        fi
+        
+        if [ -z "${{ secrets.CSRF_SECRET }}" ]; then
+          echo "❌ CSRF_SECRET is required"
+          exit 1
+        else
+          echo "✅ CSRF_SECRET: ${CSRF_SECRET:0:4}***"
+        fi
+        
+        if [ -z "${{ secrets.CORS_ORIGIN }}" ]; then
+          echo "❌ CORS_ORIGIN is required"
+          exit 1
+        else
+          echo "✅ CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}"
+        fi
+        
+        echo "✅ Environment validation passed"
+
     - name: Install server dependencies
       working-directory: ./server
       run: npm ci
@@ -35,79 +109,80 @@ jobs:
       env:
         DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-    - name: Build server
+    - name: Run tests
       working-directory: ./server
-      run: npm run build
+      run: npm test -- --ci
       env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
         JWT_SECRET: ${{ secrets.JWT_SECRET }}
         COOKIE_SECRET: ${{ secrets.COOKIE_SECRET }}
         CSRF_SECRET: ${{ secrets.CSRF_SECRET }}
         CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
-        DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        JWT_ALGORITHM: HS512
-        JWT_ACCESS_TOKEN_EXPIRY: 10m
-        JWT_REFRESH_TOKEN_EXPIRY: 7d
+        NODE_ENV: test
 
-    - name: Deploy to Azure App Service (Staging)
-      uses: azure/webapps-deploy@v3
+    - name: Build server
+      working-directory: ./server
+      run: npm run build
+      env:
+        NODE_ENV: production
+
+    - name: Create deployment package
+      working-directory: ./server
+      run: |
+        # Remove any existing deployment artifacts
+        rm -f app_package.zip
+        rm -f oryx-manifest.toml
+        rm -f .deployment
+        
+        # Install production dependencies only
+        npm ci --only=production
+        
+        # Create deployment package
+        zip -r app_package.zip dist/ node_modules/ package.json package-lock.json
+        
+        echo "✅ Deployment package created: app_package.zip"
+
+    - name: Deploy to Azure App Service
+      uses: azure/webapps-deploy@v2
       with:
         app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
-        slot-name: staging
         publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-        package: ./server/dist
+        package: ./server/app_package.zip
 
     - name: Wait for deployment
       run: sleep 30
 
     - name: Run smoke tests
       run: |
+        echo "🔍 Running post-deployment smoke tests..."
+        
         # Test health endpoint
-        curl -fSL https://${{ secrets.AZURE_WEBAPP_NAME }}-staging.azurewebsites.net/healthz || exit 1
+        curl -sSf ${{ secrets.PRODUCTION_API_URL }}/health || {
+          echo "❌ Health endpoint test failed"
+          exit 1
+        }
         
-        # Test API endpoint (if available)
-        curl -fSL https://${{ secrets.AZURE_WEBAPP_NAME }}-staging.azurewebsites.net/api/health || exit 1
+        echo "✅ Health endpoint test passed"
         
-        echo "✅ Smoke tests passed"
-
-    - name: Login to Azure
-      uses: azure/login@v2
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-    - name: Run database migrations
-      working-directory: ./server
-      run: |
-        npx prisma migrate deploy
-      env:
-        DATABASE_URL: ${{ secrets.DATABASE_URL }}
-
-    - name: Swap staging to production
-      run: |
-        az webapp deployment slot swap \
-          --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
-          --name ${{ secrets.AZURE_WEBAPP_NAME }} \
-          --slot staging \
-          --target-slot production
-
-    - name: Verify production deployment
-      run: |
-        # Wait for swap to complete
-        sleep 60
+        # Test root endpoint
+        curl -sSf ${{ secrets.PRODUCTION_API_URL }}/ || {
+          echo "❌ Root endpoint test failed"
+          exit 1
+        }
         
-        # Test production health endpoint
-        curl -fSL https://${{ secrets.AZURE_WEBAPP_NAME }}.azurewebsites.net/healthz || exit 1
-        
-        echo "✅ Production deployment verified"
+        echo "✅ Root endpoint test passed"
+        echo "✅ All smoke tests passed"
 
     - name: Notify deployment success
       if: success()
       run: |
         echo "🎉 Backend successfully deployed to production!"
-        echo "Production URL: https://${{ secrets.AZURE_WEBAPP_NAME }}.azurewebsites.net"
+        echo "Production URL: ${{ secrets.PRODUCTION_API_URL }}"
+        echo "Health Check: ${{ secrets.PRODUCTION_API_URL }}/health"
 
     - name: Notify deployment failure
       if: failure()
       run: |
         echo "❌ Backend deployment failed!"
         echo "Check the logs above for details."
-        echo "Staging URL: https://${{ secrets.AZURE_WEBAPP_NAME }}-staging.azurewebsites.net"
+        echo "Production URL: ${{ secrets.PRODUCTION_API_URL }}"

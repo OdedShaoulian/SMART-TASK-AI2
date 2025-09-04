@@ -1,9 +1,7 @@
-name: Deploy Frontend to Azure
+name: Deploy Frontend to Azure Static Web Apps
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
     branches: [ main ]
   workflow_dispatch:
 
@@ -27,6 +25,30 @@ jobs:
         node-version: '20.x'
         cache: 'npm'
 
+    - name: Environment Variable Validation
+      run: |
+        echo "🔍 Validating required environment variables..."
+        
+        # Check AZURE_STATIC_WEB_APPS_API_TOKEN
+        if [ -z "${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}" ]; then
+          echo "❌ AZURE_STATIC_WEB_APPS_API_TOKEN is required"
+          echo "   Get this from: Azure Portal → Static Web Apps → Deployment token"
+          exit 1
+        else
+          echo "✅ AZURE_STATIC_WEB_APPS_API_TOKEN: ${AZURE_STATIC_WEB_APPS_API_TOKEN:0:4}***"
+        fi
+        
+        # Check PRODUCTION_API_URL
+        if [ -z "${{ secrets.PRODUCTION_API_URL }}" ]; then
+          echo "❌ PRODUCTION_API_URL is required"
+          echo "   This should be your backend API URL (e.g., https://your-backend.azurewebsites.net)"
+          exit 1
+        else
+          echo "✅ PRODUCTION_API_URL: ${{ secrets.PRODUCTION_API_URL }}"
+        fi
+        
+        echo "✅ Environment validation passed"
+
     - name: Install client dependencies
       working-directory: ./client
       run: npm ci
@@ -35,8 +57,7 @@ jobs:
       working-directory: ./client
       run: npm run build
       env:
-        # Use staging API URL for PRs, production for main
-        VITE_API_URL: ${{ github.ref == 'refs/heads/main' && secrets.PRODUCTION_API_URL || secrets.STAGING_API_URL }}
+        VITE_API_URL: ${{ secrets.PRODUCTION_API_URL }}
 
     - name: Deploy to Azure Static Web Apps
       uses: Azure/static-web-apps-deploy@v1
@@ -44,56 +65,42 @@ jobs:
         action: "upload"
         azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
         repo_token: ${{ secrets.GITHUB_TOKEN }}
-        app_location: "/client"
-        api_location: ""
+        app_location: "./client"
         output_location: "dist"
-        skip_app_build: true
+        app_build_command: "npm ci && npm run build"
+        deployment_environment: production
 
     - name: Get deployment URL
       id: deployment_url
       run: |
-        if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-          echo "url=https://${{ secrets.AZURE_STATIC_WEB_APP_NAME }}.azurestaticapps.net" >> $GITHUB_OUTPUT
-        else
-          # For PRs, we'll construct the preview URL
-          echo "url=https://${{ secrets.AZURE_STATIC_WEB_APP_NAME }}.azurestaticapps.net" >> $GITHUB_OUTPUT
-        fi
+        echo "url=https://${{ secrets.AZURE_STATIC_WEB_APP_NAME }}.azurestaticapps.net" >> $GITHUB_OUTPUT
 
-    - name: Comment PR with preview URL
-      if: github.event_name == 'pull_request'
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const deploymentUrl = '${{ steps.deployment_url.outputs.url }}';
-          const comment = `🚀 **Preview deployment ready!**
-          
-          **Preview URL:** ${deploymentUrl}
-          
-          This preview will be automatically updated with each push to this PR.
-          
-          ---
-          *Deployed by GitHub Actions*`;
-          
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: comment
-          });
+    - name: Wait for deployment
+      run: sleep 30
+
+    - name: Run smoke tests
+      run: |
+        echo "🔍 Running post-deployment smoke tests..."
+        
+        # Test frontend deployment
+        curl -sSf ${{ steps.deployment_url.outputs.url }} || {
+          echo "❌ Frontend deployment test failed"
+          exit 1
+        }
+        
+        echo "✅ Frontend deployment test passed"
+        echo "✅ All smoke tests passed"
 
     - name: Notify deployment success
       if: success()
       run: |
-        if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-          echo "🎉 Frontend successfully deployed to production!"
-          echo "Production URL: ${{ steps.deployment_url.outputs.url }}"
-        else
-          echo "🎉 Frontend preview deployed!"
-          echo "Preview URL: ${{ steps.deployment_url.outputs.url }}"
-        fi
+        echo "🎉 Frontend successfully deployed to Azure Static Web Apps!"
+        echo "Production URL: ${{ steps.deployment_url.outputs.url }}"
+        echo "Backend API: ${{ secrets.PRODUCTION_API_URL }}"
 
     - name: Notify deployment failure
       if: failure()
       run: |
         echo "❌ Frontend deployment failed!"
         echo "Check the logs above for details."
+        echo "Ensure AZURE_STATIC_WEB_APPS_API_TOKEN and PRODUCTION_API_URL are set in GitHub Secrets"

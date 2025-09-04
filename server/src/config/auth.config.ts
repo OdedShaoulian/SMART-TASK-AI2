@@ -1,34 +1,64 @@
 import dotenv from 'dotenv';
+import { validateServerEnv, type ServerEnv } from '../../../tools/env-schema';
 
+// Load environment variables
 dotenv.config();
+
+// Validate environment variables early (skip in test environment)
+let env: ServerEnv;
+try {
+  env = validateServerEnv();
+} catch (error) {
+  if (process.env.NODE_ENV !== 'test') {
+    console.error('❌ Environment validation failed:', error instanceof Error ? error.message : 'Unknown error');
+    process.exit(1);
+  }
+  // In test environment, use mock values
+  env = {
+    DATABASE_URL: 'file:./test.db',
+    JWT_SECRET: 'test-jwt-secret-that-is-long-enough-32-chars',
+    COOKIE_SECRET: 'test-cookie-secret-16-chars',
+    CSRF_SECRET: 'test-csrf-secret-16-chars',
+    CORS_ORIGIN: 'http://localhost:3000',
+    PORT: 3000,
+    NODE_ENV: 'test',
+    RATE_LIMIT_WINDOW_MS: 900000,
+    RATE_LIMIT_MAX_REQUESTS: 100,
+    LOGIN_RATE_LIMIT_WINDOW_MS: 900000,
+    LOGIN_RATE_LIMIT_MAX_ATTEMPTS: 5,
+    JWT_ALGORITHM: 'HS256',
+    JWT_ACCESS_TOKEN_EXPIRY: '10m',
+    JWT_REFRESH_TOKEN_EXPIRY: '7d',
+  } as ServerEnv;
+}
 
 export const authConfig = {
   jwt: {
-    secret: process.env.JWT_SECRET || 'fallback-secret-change-in-production',
-    algorithm: (process.env.JWT_ALGORITHM as 'HS512' | 'RS256') || 'HS512',
-    accessTokenExpiry: process.env.JWT_ACCESS_TOKEN_EXPIRY || '10m',
-    refreshTokenExpiry: process.env.JWT_REFRESH_TOKEN_EXPIRY || '7d',
+    secret: env.JWT_SECRET,
+    algorithm: env.JWT_ALGORITHM,
+    accessTokenExpiry: env.JWT_ACCESS_TOKEN_EXPIRY,
+    refreshTokenExpiry: env.JWT_REFRESH_TOKEN_EXPIRY,
   },
   security: {
-    cookieSecret: process.env.COOKIE_SECRET || 'fallback-cookie-secret-change-in-production',
-    csrfSecret: process.env.CSRF_SECRET || 'fallback-csrf-secret-change-in-production',
+    cookieSecret: env.COOKIE_SECRET,
+    csrfSecret: env.CSRF_SECRET,
     passwordMinLength: 8,
-    maxFailedLoginAttempts: 5,
-    accountLockoutDuration: 15 * 60 * 1000, // 15 minutes in milliseconds
+    maxFailedLoginAttempts: env.LOGIN_RATE_LIMIT_MAX_ATTEMPTS,
+    accountLockoutDuration: env.LOGIN_RATE_LIMIT_WINDOW_MS,
   },
   rateLimiting: {
-    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
-    maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),
-    loginWindowMs: parseInt(process.env.LOGIN_RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
-    maxLoginAttempts: parseInt(process.env.LOGIN_RATE_LIMIT_MAX_ATTEMPTS || '5'),
+    windowMs: env.RATE_LIMIT_WINDOW_MS,
+    maxRequests: env.RATE_LIMIT_MAX_REQUESTS,
+    loginWindowMs: env.LOGIN_RATE_LIMIT_WINDOW_MS,
+    maxLoginAttempts: env.LOGIN_RATE_LIMIT_MAX_ATTEMPTS,
   },
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    origin: env.CORS_ORIGIN,
     credentials: true,
   },
   cookies: {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: env.NODE_ENV === 'production',
     sameSite: 'strict' as const,
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   },
@@ -36,15 +66,7 @@ export const authConfig = {
 
 // Validation function to ensure required config is present
 export function validateAuthConfig(): void {
-  if (!authConfig.jwt.secret || authConfig.jwt.secret === 'fallback-secret-change-in-production') {
-    throw new Error('JWT_SECRET environment variable is required');
-  }
-  
-  if (!authConfig.security.cookieSecret || authConfig.security.cookieSecret === 'fallback-cookie-secret-change-in-production') {
-    throw new Error('COOKIE_SECRET environment variable is required');
-  }
-  
-  if (!authConfig.security.csrfSecret || authConfig.security.csrfSecret === 'fallback-csrf-secret-change-in-production') {
-    throw new Error('CSRF_SECRET environment variable is required');
-  }
+  // Environment variables are already validated by validateServerEnv()
+  // This function is kept for backward compatibility
+  console.log('✅ Environment validation passed');
 }

@@ -41,6 +41,26 @@ jobs:
       working-directory: ./client
       run: npm ci
 
+    - name: Environment Variable Validation
+      working-directory: ./server
+      run: |
+        echo "🔍 Checking environment variables..."
+        node ../../tools/print-env-check.js
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        JWT_SECRET: test-jwt-secret
+        COOKIE_SECRET: test-cookie-secret
+        CSRF_SECRET: test-csrf-secret
+        CORS_ORIGIN: http://localhost:5173
+        JWT_ALGORITHM: HS256
+        JWT_ACCESS_TOKEN_EXPIRY: 10m
+        JWT_REFRESH_TOKEN_EXPIRY: 7d
+        RATE_LIMIT_WINDOW_MS: 900000
+        RATE_LIMIT_MAX_REQUESTS: 100
+        LOGIN_RATE_LIMIT_WINDOW_MS: 900000
+        LOGIN_RATE_LIMIT_MAX_ATTEMPTS: 5
+        NODE_ENV: test
+
     - name: Generate Prisma client
       working-directory: ./server
       run: npx prisma generate
@@ -55,10 +75,16 @@ jobs:
         COOKIE_SECRET: test-cookie-secret
         CSRF_SECRET: test-csrf-secret
         CORS_ORIGIN: http://localhost:5173
+        PRODUCTION_API_URL: http://localhost:3000
         DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        JWT_ALGORITHM: HS512
+        JWT_ALGORITHM: HS256
         JWT_ACCESS_TOKEN_EXPIRY: 10m
         JWT_REFRESH_TOKEN_EXPIRY: 7d
+        RATE_LIMIT_WINDOW_MS: 900000
+        RATE_LIMIT_MAX_REQUESTS: 100
+        LOGIN_RATE_LIMIT_WINDOW_MS: 900000
+        LOGIN_RATE_LIMIT_MAX_ATTEMPTS: 5
+        NODE_ENV: test
 
     - name: Run client tests
       working-directory: ./client
@@ -96,6 +122,26 @@ jobs:
       env:
         DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
+    - name: Environment Variable Validation
+      working-directory: ./server
+      run: |
+        echo "🔍 Checking environment variables for build..."
+        node ../../tools/print-env-check.js
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        JWT_SECRET: build-jwt-secret
+        COOKIE_SECRET: build-cookie-secret
+        CSRF_SECRET: build-csrf-secret
+        CORS_ORIGIN: http://localhost:5173
+        JWT_ALGORITHM: HS256
+        JWT_ACCESS_TOKEN_EXPIRY: 10m
+        JWT_REFRESH_TOKEN_EXPIRY: 7d
+        RATE_LIMIT_WINDOW_MS: 900000
+        RATE_LIMIT_MAX_REQUESTS: 100
+        LOGIN_RATE_LIMIT_WINDOW_MS: 900000
+        LOGIN_RATE_LIMIT_MAX_ATTEMPTS: 5
+        NODE_ENV: build
+
     - name: Build server
       working-directory: ./server
       run: npm run build
@@ -104,10 +150,16 @@ jobs:
         COOKIE_SECRET: build-cookie-secret
         CSRF_SECRET: build-csrf-secret
         CORS_ORIGIN: http://localhost:5173
+        PRODUCTION_API_URL: http://localhost:3000
         DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        JWT_ALGORITHM: HS512
+        JWT_ALGORITHM: HS256
         JWT_ACCESS_TOKEN_EXPIRY: 10m
         JWT_REFRESH_TOKEN_EXPIRY: 7d
+        RATE_LIMIT_WINDOW_MS: 900000
+        RATE_LIMIT_MAX_REQUESTS: 100
+        LOGIN_RATE_LIMIT_WINDOW_MS: 900000
+        LOGIN_RATE_LIMIT_MAX_ATTEMPTS: 5
+        NODE_ENV: build
 
     - name: Build client
       working-directory: ./client

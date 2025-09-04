@@ -19,11 +19,15 @@
     "test:client": "cd client && npm test",
     "test:e2e": "cd client && npm run test:e2e",
     "install:all": "npm install && cd server && npm install && cd ../client && npm install",
-    "clean": "rm -rf node_modules server/node_modules client/node_modules server/dist client/dist"
+    "clean": "rm -rf node_modules server/node_modules client/node_modules server/dist client/dist",
+    "env:check": "node tools/print-env-check.js",
+    "env:validate": "npm run env:check && echo '✅ Environment validation passed'"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "zod": "^3.22.4",
+    "vitest": "^3.2.4"
   },
   "keywords": [
     "authentication",
