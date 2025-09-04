@@ -20,14 +20,22 @@ export class App {
     
     // --- BEGIN guaranteed health endpoints (mounted first) ---
     this.app.get('/health', (_req, res) => {
+      console.log('Health endpoint /health accessed');
       res.status(200).json({ status: 'ok', uptime: Math.round(process.uptime()), timestamp: new Date().toISOString() });
     });
     this.app.get('/api/health', (_req, res) => {
+      console.log('Health endpoint /api/health accessed');
       res.status(200).json({ status: 'ok', uptime: Math.round(process.uptime()), timestamp: new Date().toISOString() });
     });
     // optional extra alias
     this.app.get('/healthz', (_req, res) => {
+      console.log('Health endpoint /healthz accessed');
       res.status(200).json({ status: 'ok', uptime: Math.round(process.uptime()), timestamp: new Date().toISOString() });
+    });
+    // Test endpoint to verify basic routing works
+    this.app.get('/test', (_req, res) => {
+      console.log('Test endpoint /test accessed');
+      res.status(200).json({ message: 'Test endpoint working', timestamp: new Date().toISOString() });
     });
     // --- END guaranteed health endpoints ---
     
@@ -112,20 +120,34 @@ export class App {
 
   public async start(): Promise<void> {
     try {
+      console.log('Starting server...');
+      
       // Validate configuration
+      console.log('Validating auth config...');
       validateAuthConfig();
+      console.log('Auth config validated');
 
       // Test database connection
+      console.log('Connecting to database...');
       await this.prisma.$connect();
+      console.log('Database connection established');
       logger.info('Database connection established');
 
       // Start server
       const port = process.env.PORT || 3000;
+      console.log(`Starting server on port ${port}...`);
       this.app.listen(port, () => {
+        console.log(`✅ Server started successfully on port ${port}`);
+        console.log(`✅ Health endpoints available at:`);
+        console.log(`   - http://localhost:${port}/health`);
+        console.log(`   - http://localhost:${port}/api/health`);
+        console.log(`   - http://localhost:${port}/healthz`);
+        console.log(`   - http://localhost:${port}/test`);
         logger.info(`Server started on port ${port}`);
         logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
       });
     } catch (error) {
+      console.error('❌ Failed to start application:', error);
       logger.error('Failed to start application', {
         error: error instanceof Error ? error.message : 'Unknown error',
       });

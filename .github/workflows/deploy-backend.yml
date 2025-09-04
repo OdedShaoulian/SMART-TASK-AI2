@@ -190,6 +190,7 @@ jobs:
         URL1="$API_URL/health"
         URL2="$API_URL/api/health"
         URL3="$API_URL/healthz"
+        URL4="$API_URL/test"
 
         CODE1="$(try "$URL1")"
         if [ "$CODE1" = "200" ]; then echo "✅ Backend OK ($URL1)"; exit 0; fi
@@ -200,11 +201,15 @@ jobs:
         CODE3="$(try "$URL3")"
         if [ "$CODE3" = "200" ]; then echo "✅ Backend OK ($URL3)"; exit 0; fi
 
+        CODE4="$(try "$URL4")"
+        if [ "$CODE4" = "200" ]; then echo "✅ Backend OK ($URL4)"; exit 0; fi
+
         echo "❌ Backend deployment test failed"
         echo "   Tried:"
         echo "   - $URL1 (got $CODE1)"
         echo "   - $URL2 (got $CODE2)"
         echo "   - $URL3 (got $CODE3)"
+        echo "   - $URL4 (got $CODE4)"
         exit 1
 
     - name: Notify deployment success
