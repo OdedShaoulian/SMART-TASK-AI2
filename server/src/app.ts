@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import requestId from 'express-request-id';
 import { PrismaClient } from '@prisma/client';
 import { createAuthRoutes } from './modules/auth/auth.routes';
+import { healthRouter } from './routes/health';
 import { logger, loggerMiddleware } from './utils/logger';
 import { authConfig, validateAuthConfig } from './config/auth.config';
 import { errorHandler } from './middleware/errorHandler';
@@ -24,6 +25,9 @@ export class App {
   }
 
   private initializeMiddlewares(): void {
+    // 1) Health routes FIRST (before auth/CSRF/ratelimit)
+    this.app.use(healthRouter);
+
     // Security middleware
     this.app.use(helmet({
       contentSecurityPolicy: {
@@ -67,18 +71,6 @@ export class App {
   }
 
   private initializeRoutes(): void {
-    // Health check endpoint
-    this.app.get('/health', (_req, res) => {
-      res.status(200).json({
-        status: 'ok',
-        success: true,
-        message: 'Service is healthy',
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime(),
-        environment: process.env.NODE_ENV || 'development',
-      });
-    });
-
     // API routes
     this.app.use('/api/auth', createAuthRoutes(this.prisma));
 
@@ -92,6 +84,7 @@ export class App {
         endpoints: {
           auth: '/api/auth',
           health: '/health',
+          apiHealth: '/api/health',
         },
       });
     });
