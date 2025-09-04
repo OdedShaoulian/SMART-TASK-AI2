@@ -107,6 +107,27 @@ jobs:
         
         echo "✅ Environment validation passed"
 
+    - name: Resolve backend URL for smoke test
+      run: |
+        RAW="${{ secrets.PRODUCTION_API_URL }}"
+        SANITIZED="$(echo "$RAW" | sed -e 's/^[[:space:]]*//; s/[[:space:]]*$//' \
+                                       -e 's/^"//; s/"$//' -e "s/^'//; s/'$//" \
+                                       -e 's:/*$::')"
+        echo "::add-mask::$RAW"
+        echo "::add-mask::$SANITIZED"
+        PREF="$(echo "$SANITIZED" | cut -c1-12)"
+        echo "🔎 API URL (sanitized) prefix: ${PREF}…"
+
+        if [ -z "$SANITIZED" ]; then
+          echo "❌ PRODUCTION_API_URL is missing"; exit 1; fi
+        case "$SANITIZED" in
+          http://*|https://*) : ;;
+          *) echo "❌ PRODUCTION_API_URL must start with http:// or https://"; exit 1;;
+        esac
+
+        URL="$SANITIZED" node -e 'try{ new URL(process.env.URL) }catch(e){ console.error("❌ PRODUCTION_API_URL is not a valid URL"); process.exit(1) }'
+        echo "API_URL=$SANITIZED" >> "$GITHUB_ENV"
+
     - name: Install server dependencies
       working-directory: ./server
       run: npm ci
@@ -160,27 +181,27 @@ jobs:
     - name: Wait for deployment
       run: sleep 30
 
-    - name: Post-deploy smoke test
+    - name: Backend post-deploy smoke test
       run: |
-        echo "🔍 Running post-deployment smoke tests..."
-        
-        # Test health endpoint
-        curl -sSf ${{ secrets.PRODUCTION_API_URL }}/health || {
-          echo "❌ Health endpoint test failed"
-          echo "   Expected: GET ${{ secrets.PRODUCTION_API_URL }}/health"
-          echo "   Response: 200 OK with {status:\"ok\"}"
+        echo "🔍 Running backend smoke test against: ${API_URL:0:12}…"
+        set -e
+        # Try /health then /api/health
+        if curl -fsS -o /dev/null "$API_URL/health"; then
+          echo "✅ Backend OK (/health)"
+        elif curl -fsS -o /dev/null "$API_URL/api/health"; then
+          echo "✅ Backend OK (/api/health)"
+        else
+          echo "❌ Backend deployment test failed"
+          echo "   Tried: $API_URL/health and $API_URL/api/health"
           exit 1
-        }
-        
-        echo "✅ Health endpoint test passed"
-        echo "✅ All smoke tests passed"
+        fi
 
     - name: Notify deployment success
       if: success()
       run: |
         echo "🎉 Backend successfully deployed to production!"
-        echo "Production URL: ${{ secrets.PRODUCTION_API_URL }}"
-        echo "Health Check: ${{ secrets.PRODUCTION_API_URL }}/health"
+        echo "Production URL: ${API_URL:0:12}…"
+        echo "Health Check: ${API_URL:0:12}…/health"
 
     - name: Notify deployment failure
       if: failure()

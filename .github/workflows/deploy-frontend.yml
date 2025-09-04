@@ -104,6 +104,7 @@ jobs:
         npm run build
 
     - name: Deploy to Azure Static Web Apps (upload prebuilt)
+      id: deploy_swa
       uses: Azure/static-web-apps-deploy@v1
       with:
         azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
@@ -113,35 +114,48 @@ jobs:
         skip_app_build: true
         deployment_environment: production
 
-    - name: Get deployment URL
-      id: deployment_url
+    - name: Resolve SWA URL for smoke test
       run: |
-        echo "url=https://${{ secrets.AZURE_STATIC_WEB_APP_NAME }}.azurestaticapps.net" >> $GITHUB_OUTPUT
+        RAW="${{ steps.deploy_swa.outputs.static_web_app_url }}"
+        [ -z "$RAW" ] && RAW="${{ secrets.FRONTEND_URL }}"
+        SANITIZED="$(echo "$RAW" | sed -e 's/^[[:space:]]*//; s/[[:space:]]*$//' \
+                                       -e 's/^"//; s/"$//' -e "s/^'//; s/'$//" \
+                                       -e 's:/*$::')"
+        echo "::add-mask::$RAW"
+        echo "::add-mask::$SANITIZED"
+        PREF="$(echo "$SANITIZED" | cut -c1-12)"
+        echo "🔎 SWA URL (raw) prefix: $(echo "$RAW" | cut -c1-12)…"
+        echo "🔎 SWA URL (sanitized) prefix: ${PREF}…"
 
-    - name: Wait for deployment
-      run: sleep 30
+        if [ -z "$SANITIZED" ]; then
+          echo "❌ SWA URL not found. The deploy action produced no static_web_app_url and FRONTEND_URL secret is not set."; exit 1; fi
+        case "$SANITIZED" in
+          http://*|https://*) : ;;
+          *) echo "❌ SWA URL must start with http:// or https://"; exit 1;;
+        esac
 
-    - name: Post-deploy smoke test
+        URL="$SANITIZED" node -e 'try{ new URL(process.env.URL) }catch(e){ console.error("❌ SWA URL is not a valid URL"); process.exit(1) }'
+        echo "SWA_URL=$SANITIZED" >> "$GITHUB_ENV"
+
+    - name: Frontend post-deploy smoke test
       run: |
-        echo "🔍 Running post-deployment smoke tests..."
-        
-        # Test frontend deployment
-        curl -sSf ${{ steps.deployment_url.outputs.url }} || {
+        echo "🔍 Running frontend smoke test against: ${SWA_URL:0:12}…"
+        # Expect HTTP 200 (SPA fallback ok)
+        CODE="$(curl -fsS -o /dev/null -w "%{http_code}" "$SWA_URL/")" || { echo "❌ Frontend unreachable"; exit 1; }
+        if [ "$CODE" != "200" ]; then
           echo "❌ Frontend deployment test failed"
-          echo "   Expected: GET ${{ steps.deployment_url.outputs.url }}"
-          echo "   Response: 200 OK with SPA fallback"
+          echo "   Expected: GET $SWA_URL → 200 OK (SPA fallback)"
+          echo "   Got: $CODE"
           exit 1
-        }
-        
-        echo "✅ Frontend deployment test passed"
-        echo "✅ All smoke tests passed"
+        fi
+        echo "✅ Frontend OK (200)"
 
     - name: Notify deployment success
       if: success()
       run: |
         echo "🎉 Frontend successfully deployed to Azure Static Web Apps!"
-        echo "Production URL: ${{ steps.deployment_url.outputs.url }}"
-        echo "Backend API: ${{ secrets.PRODUCTION_API_URL }}"
+        echo "Production URL: ${SWA_URL:0:12}…"
+        echo "Backend API: ${SANITIZED_API_URL:0:12}…"
         echo "SPA Fallback: Configured via staticwebapp.config.json"
 
     - name: Notify deployment failure

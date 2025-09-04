@@ -468,6 +468,22 @@ Ensure your backend allows CORS from the SWA domain:
 CORS_ORIGIN=https://your-app.azurestaticapps.net
 ```
 
+### 🧪 Smoke Tests
+
+Both frontend and backend deployments include automated smoke tests:
+
+**Frontend (SWA):**
+- Uses `static_web_app_url` from the SWA action output
+- Optional fallback: `FRONTEND_URL` secret (set to SWA Overview → URL)
+- Tests: GET `/` expecting HTTP 200 (SPA fallback)
+- Logs show masked URL prefixes for security
+
+**Backend (App Service):**
+- Uses `PRODUCTION_API_URL` secret (required)
+- Tests: GET `/health` or `/api/health` expecting HTTP 200
+- Logs show masked URL prefixes for security
+- Fails fast with actionable error messages
+
 ### 📝 Staging (Disabled)
 
 Staging deployment blocks are present but commented out. To enable:
