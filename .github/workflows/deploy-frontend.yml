@@ -42,6 +42,14 @@ jobs:
         node-version: '20.x'
         cache: 'npm'
 
+    - name: Validate PRODUCTION_API_URL
+      run: |
+        if [ -z "${{ secrets.PRODUCTION_API_URL }}" ]; then
+          echo "❌ PRODUCTION_API_URL is missing"; exit 1; fi
+        node -e "try{new URL(process.env.URL)}catch(e){console.error('❌ PRODUCTION_API_URL must be a full, valid URL');process.exit(1)}"
+      env:
+        URL: ${{ secrets.PRODUCTION_API_URL }}
+
     - name: Early Env Validation
       run: |
         echo "🔍 Validating required environment variables..."
@@ -55,13 +63,13 @@ jobs:
           echo "✅ AZURE_STATIC_WEB_APPS_API_TOKEN: ${AZURE_STATIC_WEB_APPS_API_TOKEN:0:4}***"
         fi
         
-        # Check PRODUCTION_API_URL
+        # Check PRODUCTION_API_URL (already validated above, but show masked value)
         if [ -z "${{ secrets.PRODUCTION_API_URL }}" ]; then
           echo "❌ PRODUCTION_API_URL is required"
           echo "   This should be your backend API URL (e.g., https://your-backend.azurewebsites.net)"
           exit 1
         else
-          echo "✅ PRODUCTION_API_URL: ${{ secrets.PRODUCTION_API_URL }}"
+          echo "✅ PRODUCTION_API_URL: $(echo '${{ secrets.PRODUCTION_API_URL }}' | cut -c1-8)…"
         fi
         
         echo "✅ Environment validation passed"
@@ -78,6 +86,8 @@ jobs:
 
     - name: Deploy to Azure Static Web Apps
       uses: Azure/static-web-apps-deploy@v1
+      env:
+        VITE_API_URL: ${{ secrets.PRODUCTION_API_URL }}
       with:
         azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
         action: upload

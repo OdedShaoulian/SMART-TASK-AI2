@@ -5,28 +5,37 @@ import { resolve } from 'path'
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
-  // Load environment variables
-  const env = loadEnv(mode, process.cwd(), '')
+  // Load environment variables with precedence: process.env first, then loadEnv
+  const fileEnv = loadEnv(mode, process.cwd(), '')
+  let apiUrlRaw = (process.env.VITE_API_URL ?? fileEnv.VITE_API_URL ?? '').trim()
   
-  // Validate required environment variables at build time (skip in test mode)
-  if (!env.VITE_API_URL && mode !== 'test') {
-    throw new Error('VITE_API_URL environment variable is required for client build')
-  }
+  // Sanitize the URL: remove wrapping quotes and trailing slashes
+  apiUrlRaw = apiUrlRaw.replace(/^['"]|['"]$/g, '').replace(/\/+$/g, '')
   
   // Set default for test mode
-  if (!env.VITE_API_URL) {
-    env.VITE_API_URL = 'http://localhost:3000'
+  if (!apiUrlRaw && mode === 'test') {
+    apiUrlRaw = 'http://localhost:3000'
   }
   
-  // Validate URL format (skip in test mode)
+  // Validate for non-test modes
   if (mode !== 'test') {
-    try {
-      new URL(env.VITE_API_URL)
-    } catch {
-      throw new Error(`VITE_API_URL must be a valid URL: ${env.VITE_API_URL}`)
+    if (!apiUrlRaw) {
+      throw new Error('VITE_API_URL environment variable is required for client build')
     }
-    console.log(`✅ Building client with API URL: ${env.VITE_API_URL}`)
+    if (!/^https?:\/\//i.test(apiUrlRaw)) {
+      throw new Error('VITE_API_URL must start with http:// or https://')
+    }
+    try {
+      new URL(apiUrlRaw)
+    } catch {
+      throw new Error('VITE_API_URL must be a full, valid URL')
+    }
+    const masked = apiUrlRaw.slice(0, 8) + '…'
+    console.log(`✅ Building client with API URL: ${masked}`)
   }
+  
+  // Use the final sanitized value
+  const API_URL = apiUrlRaw || 'http://localhost:3000'
   
   return {
     plugins: [react()],
@@ -45,7 +54,7 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       proxy: {
         '/api': {
-          target: env.VITE_API_URL,
+          target: API_URL,
           changeOrigin: true,
         },
       },
@@ -67,7 +76,7 @@ export default defineConfig(({ mode }) => {
     },
     define: {
       // Make environment variables available to the client
-      __VITE_API_URL__: JSON.stringify(env.VITE_API_URL),
+      __VITE_API_URL__: JSON.stringify(API_URL),
     },
   }
 })
