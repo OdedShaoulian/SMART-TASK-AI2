@@ -3,12 +3,12 @@ import helmet from 'helmet';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import requestId from 'express-request-id';
+import path from 'path';
 import { PrismaClient } from '@prisma/client';
 import { createAuthRoutes } from './modules/auth/auth.routes';
 import { logger, loggerMiddleware } from './utils/logger';
 import { authConfig, validateAuthConfig } from './config/auth.config';
 import { errorHandler } from './middleware/errorHandler';
-import { notFoundHandler } from './middleware/notFoundHandler';
 
 export class App {
   public app: express.Application;
@@ -93,27 +93,39 @@ export class App {
     // API routes
     this.app.use('/api/auth', createAuthRoutes(this.prisma));
 
-    // Root endpoint
-    this.app.get('/', (_req, res) => {
-      res.status(200).json({
-        success: true,
-        message: 'Smart Task AI API',
-        version: '1.0.0',
-        timestamp: new Date().toISOString(),
-        endpoints: {
-          auth: '/api/auth',
-          health: '/health',
-          apiHealth: '/api/health',
-          healthz: '/healthz',
-        },
-      });
+    // Serve static files from client dist directory
+    const clientDistPath = path.join(__dirname, '../../client/dist');
+    this.app.use(express.static(clientDistPath, {
+      maxAge: '1d', // Cache static assets for 1 day
+      etag: true,
+      lastModified: true,
+      setHeaders: (res, path) => {
+        // Set proper MIME types for JavaScript modules
+        if (path.endsWith('.js')) {
+          res.setHeader('Content-Type', 'application/javascript');
+        }
+        // Enable CORS for static assets
+        res.setHeader('Access-Control-Allow-Origin', '*');
+      }
+    }));
+
+    // SPA fallback: serve index.html for all non-API routes
+    this.app.get('*', (req, res) => {
+      // Skip API routes and health endpoints
+      if (req.path.startsWith('/api') || 
+          req.path === '/health' || 
+          req.path === '/api/health' || 
+          req.path === '/healthz' || 
+          req.path === '/test') {
+        return res.status(404).json({ error: 'Not found' });
+      }
+      
+      // Serve the React app for all other routes
+      return res.sendFile(path.join(clientDistPath, 'index.html'));
     });
   }
 
   private initializeErrorHandling(): void {
-    // 404 handler
-    this.app.use(notFoundHandler);
-
     // Global error handler
     this.app.use(errorHandler);
   }
