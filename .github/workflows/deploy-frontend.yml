@@ -67,8 +67,8 @@ jobs:
           *) echo "❌ PRODUCTION_API_URL must start with http:// or https://"; exit 1;;
         esac
 
-        node -e 'try{new URL(process.env.URL)}catch(e){console.error("❌ PRODUCTION_API_URL must be a full, valid URL (example: https://<your-backend>.azurewebsites.net)");process.exit(1)}' \
-          --url="$SANITIZED"
+        # ✅ Validate via ENV (fixes 'node: bad option: --url=...')
+        URL="$SANITIZED" node -e 'try{ new URL(process.env.URL) }catch(e){ console.error("❌ PRODUCTION_API_URL must be a full, valid URL (example: https://<your-backend>.azurewebsites.net)"); process.exit(1) }'
 
         if echo "$SANITIZED" | grep -qi 'azurestaticapps\.net'; then
           echo "⚠️ PRODUCTION_API_URL looks like a Static Web Apps frontend URL; expected the backend Web App domain (azurewebsites.net)."
