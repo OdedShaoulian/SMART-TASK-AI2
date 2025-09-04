@@ -185,14 +185,26 @@ jobs:
       run: |
         echo "🔍 Running backend smoke test against: ${API_URL:0:12}…"
         set -e
-        CODE1="$(curl -fsS -o /dev/null -w "%{http_code}" "$API_URL/health" || echo 000)"
-        if [ "$CODE1" = "200" ]; then
-          echo "✅ Backend OK (/health)"; exit 0; fi
-        CODE2="$(curl -fsS -o /dev/null -w "%{http_code}" "$API_URL/api/health" || echo 000)"
-        if [ "$CODE2" = "200" ]; then
-          echo "✅ Backend OK (/api/health)"; exit 0; fi
+        try() { curl -fsS -o /dev/null -w "%{http_code}" "$1" || echo 000; }
+
+        URL1="$API_URL/health"
+        URL2="$API_URL/api/health"
+        URL3="$API_URL/healthz"
+
+        CODE1="$(try "$URL1")"
+        if [ "$CODE1" = "200" ]; then echo "✅ Backend OK ($URL1)"; exit 0; fi
+
+        CODE2="$(try "$URL2")"
+        if [ "$CODE2" = "200" ]; then echo "✅ Backend OK ($URL2)"; exit 0; fi
+
+        CODE3="$(try "$URL3")"
+        if [ "$CODE3" = "200" ]; then echo "✅ Backend OK ($URL3)"; exit 0; fi
+
         echo "❌ Backend deployment test failed"
-        echo "   Tried: $API_URL/health (got $CODE1) and $API_URL/api/health (got $CODE2)"
+        echo "   Tried:"
+        echo "   - $URL1 (got $CODE1)"
+        echo "   - $URL2 (got $CODE2)"
+        echo "   - $URL3 (got $CODE3)"
         exit 1
 
     - name: Notify deployment success

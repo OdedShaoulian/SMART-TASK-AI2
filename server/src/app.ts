@@ -5,7 +5,6 @@ import cookieParser from 'cookie-parser';
 import requestId from 'express-request-id';
 import { PrismaClient } from '@prisma/client';
 import { createAuthRoutes } from './modules/auth/auth.routes';
-import { healthRouter } from './routes/health';
 import { logger, loggerMiddleware } from './utils/logger';
 import { authConfig, validateAuthConfig } from './config/auth.config';
 import { errorHandler } from './middleware/errorHandler';
@@ -19,15 +18,27 @@ export class App {
     this.app = express();
     this.prisma = new PrismaClient();
     
+    // --- BEGIN guaranteed health endpoints (mounted first) ---
+    this.app.get('/health', (_req, res) => {
+      res.status(200).json({ status: 'ok', uptime: Math.round(process.uptime()), timestamp: new Date().toISOString() });
+    });
+    this.app.get('/api/health', (_req, res) => {
+      res.status(200).json({ status: 'ok', uptime: Math.round(process.uptime()), timestamp: new Date().toISOString() });
+    });
+    // optional extra alias
+    this.app.get('/healthz', (_req, res) => {
+      res.status(200).json({ status: 'ok', uptime: Math.round(process.uptime()), timestamp: new Date().toISOString() });
+    });
+    // --- END guaranteed health endpoints ---
+    
+    console.log('Health endpoints ready at /health, /api/health, /healthz');
+    
     this.initializeMiddlewares();
     this.initializeRoutes();
     this.initializeErrorHandling();
   }
 
   private initializeMiddlewares(): void {
-    // 1) Health routes FIRST (before auth/CSRF/ratelimit)
-    this.app.use(healthRouter);
-
     // Security middleware
     this.app.use(helmet({
       contentSecurityPolicy: {
@@ -85,6 +96,7 @@ export class App {
           auth: '/api/auth',
           health: '/health',
           apiHealth: '/api/health',
+          healthz: '/healthz',
         },
       });
     });
