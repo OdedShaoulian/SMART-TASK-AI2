@@ -4,7 +4,7 @@
     "module": "commonjs",
     "lib": ["ES2022"],
     "outDir": "./dist",
-    "rootDir": "./src",
+    "rootDir": "..",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -25,7 +25,8 @@
     "allowUnreachableCode": false
   },
   "include": [
-    "src/**/*"
+    "src/**/*.ts",
+    "../tools/env-schema.ts"
   ],
   "exclude": [
     "node_modules",

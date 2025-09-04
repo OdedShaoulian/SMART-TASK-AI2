@@ -148,13 +148,13 @@ jobs:
       working-directory: ./client
       run: npm ci
 
-    - name: TypeScript type check
+    - name: TypeScript type check (app only)
       working-directory: ./client
-      run: npx tsc --noEmit
+      run: npx tsc -p tsconfig.app.json --noEmit
 
     - name: Run client tests
       working-directory: ./client
-      run: npm test -- --run
+      run: npm test
       env:
         VITE_API_URL: ${{ secrets.PRODUCTION_API_URL || 'http://localhost:3000' }}
 
