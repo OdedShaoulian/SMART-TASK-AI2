@@ -70,6 +70,7 @@ export class App {
     // Health check endpoint
     this.app.get('/health', (_req, res) => {
       res.status(200).json({
+        status: 'ok',
         success: true,
         message: 'Service is healthy',
         timestamp: new Date().toISOString(),

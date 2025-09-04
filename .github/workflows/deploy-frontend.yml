@@ -7,13 +7,30 @@ on:
 
 # Prevent overlapping deployments
 concurrency:
-  group: frontend-deploy-${{ github.ref }}
+  group: deploy-frontend-${{ github.ref }}
   cancel-in-progress: true
+
+# === STAGING (disabled) ===
+# Uncomment the following section to enable staging deployments
+# on:
+#   push:
+#     branches: [ main, develop ]
+#   workflow_dispatch:
+#     inputs:
+#       environment:
+#         description: 'Environment to deploy to'
+#         required: true
+#         default: 'production'
+#         type: choice
+#         options:
+#         - production
+#         - staging
 
 jobs:
   deploy:
     name: Deploy to Azure Static Web Apps
     runs-on: ubuntu-latest
+    environment: production
     
     steps:
     - name: Checkout code
@@ -25,7 +42,7 @@ jobs:
         node-version: '20.x'
         cache: 'npm'
 
-    - name: Environment Variable Validation
+    - name: Early Env Validation
       run: |
         echo "🔍 Validating required environment variables..."
         
@@ -53,7 +70,7 @@ jobs:
       working-directory: ./client
       run: npm ci
 
-    - name: Build client
+    - name: Build client with VITE_API_URL
       working-directory: ./client
       run: npm run build
       env:
@@ -62,12 +79,11 @@ jobs:
     - name: Deploy to Azure Static Web Apps
       uses: Azure/static-web-apps-deploy@v1
       with:
-        action: "upload"
         azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
-        repo_token: ${{ secrets.GITHUB_TOKEN }}
-        app_location: "./client"
-        output_location: "dist"
-        app_build_command: "npm ci && npm run build"
+        action: upload
+        app_location: ./client
+        output_location: dist
+        app_build_command: npm ci && npm run build
         deployment_environment: production
 
     - name: Get deployment URL
@@ -78,13 +94,15 @@ jobs:
     - name: Wait for deployment
       run: sleep 30
 
-    - name: Run smoke tests
+    - name: Post-deploy smoke test
       run: |
         echo "🔍 Running post-deployment smoke tests..."
         
         # Test frontend deployment
         curl -sSf ${{ steps.deployment_url.outputs.url }} || {
           echo "❌ Frontend deployment test failed"
+          echo "   Expected: GET ${{ steps.deployment_url.outputs.url }}"
+          echo "   Response: 200 OK with SPA fallback"
           exit 1
         }
         
@@ -97,6 +115,7 @@ jobs:
         echo "🎉 Frontend successfully deployed to Azure Static Web Apps!"
         echo "Production URL: ${{ steps.deployment_url.outputs.url }}"
         echo "Backend API: ${{ secrets.PRODUCTION_API_URL }}"
+        echo "SPA Fallback: Configured via staticwebapp.config.json"
 
     - name: Notify deployment failure
       if: failure()
@@ -104,3 +123,33 @@ jobs:
         echo "❌ Frontend deployment failed!"
         echo "Check the logs above for details."
         echo "Ensure AZURE_STATIC_WEB_APPS_API_TOKEN and PRODUCTION_API_URL are set in GitHub Secrets"
+
+# === STAGING (disabled) ===
+# Uncomment to deploy to staging environment
+# staging-deploy:
+#   name: Deploy to Azure Static Web Apps (Staging)
+#   runs-on: ubuntu-latest
+#   environment: staging
+#   if: github.event.inputs.environment == 'staging'
+#   steps:
+#   - name: Checkout code
+#     uses: actions/checkout@v4
+#   - name: Setup Node.js
+#     uses: actions/setup-node@v4
+#     with:
+#       node-version: '20.x'
+#       cache: 'npm'
+#   - name: Build client with staging API URL
+#     working-directory: ./client
+#     run: npm run build
+#     env:
+#       VITE_API_URL: ${{ secrets.STAGING_API_URL }}
+#   - name: Deploy to Staging
+#     uses: Azure/static-web-apps-deploy@v1
+#     with:
+#       azure_static_web_apps_api_token: ${{ secrets.AZURE_STAGING_STATIC_WEB_APPS_API_TOKEN }}
+#       action: upload
+#       app_location: ./client
+#       output_location: dist
+#       app_build_command: npm ci && npm run build
+#       deployment_environment: staging

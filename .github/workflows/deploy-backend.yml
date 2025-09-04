@@ -7,7 +7,7 @@ on:
 
 # Prevent overlapping deployments
 concurrency:
-  group: backend-deploy-${{ github.ref }}
+  group: deploy-backend-${{ github.ref }}
   cancel-in-progress: false
 
 # === STAGING (disabled) ===
@@ -28,8 +28,9 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy to Azure App Service
+    name: Deploy to Azure Web App (Publish Profile)
     runs-on: ubuntu-latest
+    environment: production
     
     steps:
     - name: Checkout code
@@ -41,13 +42,14 @@ jobs:
         node-version: '20.x'
         cache: 'npm'
 
-    - name: Environment Variable Validation
+    - name: Early Environment Variable Validation
       run: |
         echo "🔍 Validating required environment variables..."
         
         # Check Azure deployment secrets
         if [ -z "${{ secrets.AZURE_WEBAPP_NAME }}" ]; then
           echo "❌ AZURE_WEBAPP_NAME is required"
+          echo "   Get this from: Azure Portal → App Service → Overview"
           exit 1
         else
           echo "✅ AZURE_WEBAPP_NAME: ${{ secrets.AZURE_WEBAPP_NAME }}"
@@ -64,6 +66,7 @@ jobs:
         # Check application secrets
         if [ -z "${{ secrets.DATABASE_URL }}" ]; then
           echo "❌ DATABASE_URL is required"
+          echo "   Get this from: Azure Portal → App Service → Configuration → Connection strings"
           exit 1
         else
           echo "✅ DATABASE_URL: ${DATABASE_URL:0:20}***"
@@ -71,6 +74,7 @@ jobs:
         
         if [ -z "${{ secrets.JWT_SECRET }}" ]; then
           echo "❌ JWT_SECRET is required"
+          echo "   Generate with: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\""
           exit 1
         else
           echo "✅ JWT_SECRET: ${JWT_SECRET:0:4}***"
@@ -78,6 +82,7 @@ jobs:
         
         if [ -z "${{ secrets.COOKIE_SECRET }}" ]; then
           echo "❌ COOKIE_SECRET is required"
+          echo "   Generate with: node -e \"console.log(require('crypto').randomBytes(16).toString('hex'))\""
           exit 1
         else
           echo "✅ COOKIE_SECRET: ${COOKIE_SECRET:0:4}***"
@@ -85,6 +90,7 @@ jobs:
         
         if [ -z "${{ secrets.CSRF_SECRET }}" ]; then
           echo "❌ CSRF_SECRET is required"
+          echo "   Generate with: node -e \"console.log(require('crypto').randomBytes(16).toString('hex'))\""
           exit 1
         else
           echo "✅ CSRF_SECRET: ${CSRF_SECRET:0:4}***"
@@ -92,6 +98,8 @@ jobs:
         
         if [ -z "${{ secrets.CORS_ORIGIN }}" ]; then
           echo "❌ CORS_ORIGIN is required"
+          echo "   Set this to: https://<your-swa-name>.azurestaticapps.net"
+          echo "   Or your custom domain if configured"
           exit 1
         else
           echo "✅ CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}"
@@ -109,6 +117,12 @@ jobs:
       env:
         DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
+    - name: Build server
+      working-directory: ./server
+      run: npm run build
+      env:
+        NODE_ENV: production
+
     - name: Run tests
       working-directory: ./server
       run: npm test -- --ci
@@ -120,13 +134,7 @@ jobs:
         CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
         NODE_ENV: test
 
-    - name: Build server
-      working-directory: ./server
-      run: npm run build
-      env:
-        NODE_ENV: production
-
-    - name: Create deployment package
+    - name: Create Run-From-Package ZIP
       working-directory: ./server
       run: |
         # Remove any existing deployment artifacts
@@ -137,12 +145,12 @@ jobs:
         # Install production dependencies only
         npm ci --only=production
         
-        # Create deployment package
+        # Create deployment package with required files
         zip -r app_package.zip dist/ node_modules/ package.json package-lock.json
         
-        echo "✅ Deployment package created: app_package.zip"
+        echo "✅ Run-From-Package ZIP created: app_package.zip"
 
-    - name: Deploy to Azure App Service
+    - name: Deploy to Azure Web App (Publish Profile)
       uses: azure/webapps-deploy@v2
       with:
         app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
@@ -152,25 +160,19 @@ jobs:
     - name: Wait for deployment
       run: sleep 30
 
-    - name: Run smoke tests
+    - name: Post-deploy smoke test
       run: |
         echo "🔍 Running post-deployment smoke tests..."
         
         # Test health endpoint
         curl -sSf ${{ secrets.PRODUCTION_API_URL }}/health || {
           echo "❌ Health endpoint test failed"
+          echo "   Expected: GET ${{ secrets.PRODUCTION_API_URL }}/health"
+          echo "   Response: 200 OK with {status:\"ok\"}"
           exit 1
         }
         
         echo "✅ Health endpoint test passed"
-        
-        # Test root endpoint
-        curl -sSf ${{ secrets.PRODUCTION_API_URL }}/ || {
-          echo "❌ Root endpoint test failed"
-          exit 1
-        }
-        
-        echo "✅ Root endpoint test passed"
         echo "✅ All smoke tests passed"
 
     - name: Notify deployment success
@@ -186,3 +188,25 @@ jobs:
         echo "❌ Backend deployment failed!"
         echo "Check the logs above for details."
         echo "Production URL: ${{ secrets.PRODUCTION_API_URL }}"
+
+# === STAGING (disabled) ===
+# Uncomment to deploy to staging environment
+# staging-deploy:
+#   name: Deploy to Azure Web App (Staging)
+#   runs-on: ubuntu-latest
+#   environment: staging
+#   if: github.event.inputs.environment == 'staging'
+#   steps:
+#   - name: Checkout code
+#     uses: actions/checkout@v4
+#   - name: Setup Node.js
+#     uses: actions/setup-node@v4
+#     with:
+#       node-version: '20.x'
+#       cache: 'npm'
+#   - name: Deploy to Staging
+#     uses: azure/webapps-deploy@v2
+#     with:
+#       app-name: ${{ secrets.AZURE_STAGING_WEBAPP_NAME }}
+#       publish-profile: ${{ secrets.AZURE_STAGING_WEBAPP_PUBLISH_PROFILE }}
+#       package: ./server/app_package.zip

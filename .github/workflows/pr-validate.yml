@@ -1,0 +1,182 @@
+name: PR Validation
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches-ignore: [ main ]
+
+# Prevent overlapping runs for the same ref
+concurrency:
+  group: pr-validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server-validation:
+    name: Server Validation
+    runs-on: ubuntu-latest
+    
+    # Only run if server files changed
+    if: contains(github.event.head_commit.modified, 'server/') || contains(github.event.head_commit.added, 'server/') || contains(github.event.head_commit.removed, 'server/') || github.event_name == 'pull_request'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+
+    - name: Environment Variable Validation
+      working-directory: ./server
+      run: |
+        echo "🔍 Validating server environment variables..."
+        
+        # Check required server environment variables
+        if [ -z "$DATABASE_URL" ]; then
+          echo "❌ DATABASE_URL is required for server validation"
+          echo "   Using mock value for PR validation"
+          export DATABASE_URL="file:./test.db"
+        else
+          echo "✅ DATABASE_URL: ${DATABASE_URL:0:20}***"
+        fi
+        
+        if [ -z "$JWT_SECRET" ]; then
+          echo "❌ JWT_SECRET is required for server validation"
+          echo "   Using mock value for PR validation"
+          export JWT_SECRET="test-jwt-secret-that-is-long-enough-32-chars"
+        else
+          echo "✅ JWT_SECRET: ${JWT_SECRET:0:4}***"
+        fi
+        
+        if [ -z "$COOKIE_SECRET" ]; then
+          echo "❌ COOKIE_SECRET is required for server validation"
+          echo "   Using mock value for PR validation"
+          export COOKIE_SECRET="test-cookie-secret-16-chars"
+        else
+          echo "✅ COOKIE_SECRET: ${COOKIE_SECRET:0:4}***"
+        fi
+        
+        if [ -z "$CSRF_SECRET" ]; then
+          echo "❌ CSRF_SECRET is required for server validation"
+          echo "   Using mock value for PR validation"
+          export CSRF_SECRET="test-csrf-secret-16-chars"
+        else
+          echo "✅ CSRF_SECRET: ${CSRF_SECRET:0:4}***"
+        fi
+        
+        if [ -z "$CORS_ORIGIN" ]; then
+          echo "❌ CORS_ORIGIN is required for server validation"
+          echo "   Using mock value for PR validation"
+          export CORS_ORIGIN="http://localhost:3000"
+        else
+          echo "✅ CORS_ORIGIN: $CORS_ORIGIN"
+        fi
+        
+        echo "✅ Server environment validation passed"
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        COOKIE_SECRET: ${{ secrets.COOKIE_SECRET }}
+        CSRF_SECRET: ${{ secrets.CSRF_SECRET }}
+        CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
+
+    - name: Install server dependencies
+      working-directory: ./server
+      run: npm ci
+
+    - name: Generate Prisma client
+      working-directory: ./server
+      run: npx prisma generate
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL || 'file:./test.db' }}
+
+    - name: Build server
+      working-directory: ./server
+      run: npm run build
+      env:
+        NODE_ENV: production
+
+    - name: Run server tests
+      working-directory: ./server
+      run: npm test -- --ci
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL || 'file:./test.db' }}
+        JWT_SECRET: ${{ secrets.JWT_SECRET || 'test-jwt-secret-that-is-long-enough-32-chars' }}
+        COOKIE_SECRET: ${{ secrets.COOKIE_SECRET || 'test-cookie-secret-16-chars' }}
+        CSRF_SECRET: ${{ secrets.CSRF_SECRET || 'test-csrf-secret-16-chars' }}
+        CORS_ORIGIN: ${{ secrets.CORS_ORIGIN || 'http://localhost:3000' }}
+        NODE_ENV: test
+
+  client-validation:
+    name: Client Validation
+    runs-on: ubuntu-latest
+    
+    # Only run if client files changed
+    if: contains(github.event.head_commit.modified, 'client/') || contains(github.event.head_commit.added, 'client/') || contains(github.event.head_commit.removed, 'client/') || github.event_name == 'pull_request'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+
+    - name: Environment Variable Validation
+      run: |
+        echo "🔍 Validating client environment variables..."
+        
+        # Check required client environment variables
+        if [ -z "$VITE_API_URL" ]; then
+          echo "❌ VITE_API_URL is required for client validation"
+          echo "   Using mock value for PR validation"
+          export VITE_API_URL="http://localhost:3000"
+        else
+          echo "✅ VITE_API_URL: $VITE_API_URL"
+        fi
+        
+        echo "✅ Client environment validation passed"
+      env:
+        VITE_API_URL: ${{ secrets.PRODUCTION_API_URL }}
+
+    - name: Install client dependencies
+      working-directory: ./client
+      run: npm ci
+
+    - name: TypeScript type check
+      working-directory: ./client
+      run: npx tsc --noEmit
+
+    - name: Run client tests
+      working-directory: ./client
+      run: npm test -- --run
+      env:
+        VITE_API_URL: ${{ secrets.PRODUCTION_API_URL || 'http://localhost:3000' }}
+
+    - name: Build client (dry run)
+      working-directory: ./client
+      run: npm run build
+      env:
+        VITE_API_URL: ${{ secrets.PRODUCTION_API_URL || 'http://localhost:3000' }}
+
+# === STAGING (disabled) ===
+# Uncomment the following section to enable staging validation
+# staging-validation:
+#   name: Staging Validation
+#   runs-on: ubuntu-latest
+#   if: github.ref == 'refs/heads/develop'
+#   steps:
+#   - name: Checkout code
+#     uses: actions/checkout@v4
+#   - name: Setup Node.js
+#     uses: actions/setup-node@v4
+#     with:
+#       node-version: '20.x'
+#       cache: 'npm'
+#   - name: Validate staging environment
+#     run: echo "Staging validation would run here"

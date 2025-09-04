@@ -364,16 +364,26 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 If you discover a security vulnerability, please report it via email to [odedshaoulian@example.com](mailto:odedshaoulian@example.com) instead of using the issue tracker. See our [Security Policy](SECURITY.md) for details.
 
-## 🚀 Deploy to Existing Azure Resources (Publish Profile)
+## 🚀 CI/CD Workflows
 
-This project deploys to **existing** Azure resources using Publish Profile authentication. No resource creation is performed.
+This project uses **three GitHub Actions workflows** for comprehensive CI/CD:
+
+### 📋 Workflow Overview
+
+| Workflow | Trigger | Purpose | Environment |
+|----------|---------|---------|-------------|
+| **PR Validation** | `pull_request`, `push` (non-main) | Validate code quality and tests | Development |
+| **Deploy Backend** | `push` to main, `workflow_dispatch` | Deploy to Azure Web App | Production |
+| **Deploy Frontend** | `push` to main, `workflow_dispatch` | Deploy to Azure Static Web Apps | Production |
 
 ### 🔧 Prerequisites
 
-Ensure you have these Azure resources already created:
+Ensure you have these **existing** Azure resources:
 - **Backend**: Azure Web App (Windows) 
 - **Frontend**: Azure Static Web Apps
 - **Database**: Already provisioned with connection string
+
+**No resource creation is performed by CI/CD.**
 
 ### 📋 Required GitHub Secrets
 
@@ -408,30 +418,47 @@ CORS_ORIGIN=https://your-app.azurestaticapps.net
 NODE_ENV=production
 ```
 
-### 🚀 Deployment Process
+### 🔄 Workflow Details
 
-#### Backend Deployment:
-1. **Publish Profile Only** - Uses `azure/webapps-deploy@v2` with publish profile
-2. **Run-From-Package** - Deploys prebuilt ZIP package for optimal performance
-3. **Health Checks** - Tests `/health` endpoint after deployment
-4. **Smoke Tests** - Validates deployment success
+#### 1. PR Validation (`pr-validate.yml`)
+- **Triggers**: Pull requests, pushes to non-main branches
+- **Server Job**: Node 20, npm ci, build, tests (only if `server/**` changed)
+- **Client Job**: Node 20, npm ci, typecheck, tests, dry build (only if `client/**` changed)
+- **Environment**: Uses mock values for PR validation
+- **Concurrency**: Prevents overlapping runs
 
-#### Frontend Deployment:
-1. **Static Web Apps** - Uses `Azure/static-web-apps-deploy@v1`
-2. **Build-time Injection** - Sets `VITE_API_URL` from `PRODUCTION_API_URL` secret
-3. **SPA Fallback** - Configured via `staticwebapp.config.json`
-4. **Smoke Tests** - Validates frontend accessibility
+#### 2. Deploy Backend (`deploy-backend.yml`)
+- **Triggers**: Push to main, manual dispatch
+- **Authentication**: Publish Profile only (no Service Principal)
+- **Process**: 
+  1. Early environment validation (fail-fast)
+  2. Node 20, npm ci, build, tests
+  3. Create Run-From-Package ZIP
+  4. Deploy using `azure/webapps-deploy@v2`
+  5. Post-deploy smoke test (`/health` endpoint)
+- **Environment**: Production (with manual approval option)
+
+#### 3. Deploy Frontend (`deploy-frontend.yml`)
+- **Triggers**: Push to main, manual dispatch
+- **Process**:
+  1. Early environment validation (fail-fast)
+  2. Build with `VITE_API_URL=${{ secrets.PRODUCTION_API_URL }}`
+  3. Deploy using `Azure/static-web-apps-deploy@v1`
+  4. Post-deploy smoke test (frontend accessibility)
+- **SPA Support**: Configured via `staticwebapp.config.json`
 
 ### 🔍 Post-Deployment Verification
 
 #### Backend Health Check:
 ```bash
 curl -f https://your-backend.azurewebsites.net/health
+# Expected: 200 OK with {"status":"ok",...}
 ```
 
 #### Frontend Accessibility:
 ```bash
 curl -f https://your-app.azurestaticapps.net
+# Expected: 200 OK with SPA fallback
 ```
 
 ### 🔄 CORS Configuration
@@ -441,12 +468,18 @@ Ensure your backend allows CORS from the SWA domain:
 CORS_ORIGIN=https://your-app.azurestaticapps.net
 ```
 
-### 📝 Staging (Future)
+### 📝 Staging (Disabled)
 
 Staging deployment blocks are present but commented out. To enable:
 1. Uncomment staging sections in workflows
-2. Add staging-specific secrets
+2. Add staging-specific secrets (`STAGING_*`)
 3. Configure staging Azure resources
+
+### 🚫 Dependabot Status
+
+**Dependabot is currently disabled** for faster CI/CD testing. To re-enable:
+1. Create `.github/dependabot.yml` with your preferred configuration
+2. Uncomment any Dependabot-related workflow steps
 
 ### Manual Deployment (Alternative)
 
